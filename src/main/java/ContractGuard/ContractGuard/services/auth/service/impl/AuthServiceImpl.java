@@ -1,5 +1,6 @@
 package ContractGuard.ContractGuard.services.auth.service.impl;
 
+import ContractGuard.ContractGuard.services.auth.service.RefreshTokenService;
 import ContractGuard.ContractGuard.services.contract.model.Organization;
 import ContractGuard.ContractGuard.services.auth.dto.*;
 import ContractGuard.ContractGuard.services.auth.model.User;
@@ -11,11 +12,15 @@ import ContractGuard.ContractGuard.configs.security.JwtProvider;
 import ContractGuard.ContractGuard.services.auth.service.AuthService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 
 import java.util.Optional;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -27,6 +32,7 @@ public class AuthServiceImpl implements AuthService {
     private final OrganizationRepository organizationRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtProvider jwtProvider;
+    private final RefreshTokenService refreshTokenService;
 
     /**
      * Register a new user and organization
@@ -76,7 +82,6 @@ public class AuthServiceImpl implements AuthService {
         return RegisterResponse.builder()
             .user(mapUserToResponse(savedUser))
             .organization(mapOrgToResponse(savedOrg))
-            .token(token)
             .build();
     }
 
@@ -101,15 +106,38 @@ public class AuthServiceImpl implements AuthService {
 
         // Generate JWT token
         String token = jwtProvider.generateToken(user.getId(), user.getEmail());
+        String refreshToken = refreshTokenService.createRefreshToken(user.getId(), user.getEmail());
 
         log.info("User logged in successfully: {}", user.getId());
 
         return LoginResponse.builder()
-            .token(token)
-            .user(mapUserToResponse(user))
-            .organization(mapOrgToResponse(user.getOrganization()))
-            .build();
+                .token(token)
+                .refreshToken(refreshToken)
+                .user(mapUserToResponse(user))
+                .organization(mapOrgToResponse(user.getOrganization()))
+                .build();
     }
+
+    @PostMapping("/refresh")
+    public ResponseEntity<RefreshTokenResponse> refresh(@RequestBody RefreshTokenRequest request) {
+
+        UUID userId = refreshTokenService.validateRefreshToken(request.getRefreshToken());
+        String email = jwtProvider.getEmailFromToken(request.getRefreshToken());
+
+        String newAccessToken = jwtProvider.generateToken(userId, email);
+        String newRefreshToken = refreshTokenService.createRefreshToken(userId, email);
+
+        // Optional: rotate tokens (delete old one)
+        refreshTokenService.deleteRefreshToken(request.getRefreshToken());
+
+        return ResponseEntity.ok(
+                RefreshTokenResponse.builder()
+                        .token(newAccessToken)
+                        .refreshToken(newRefreshToken)
+                        .build()
+        );
+    }
+
 
     /**
      * Validate JWT token
