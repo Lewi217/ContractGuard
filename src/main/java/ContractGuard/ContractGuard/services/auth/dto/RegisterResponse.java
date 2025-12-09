@@ -10,6 +10,5 @@ import lombok.*;
 public class RegisterResponse {
     private UserResponse user;
     private OrganizationResponse organization;
-    private String token;
 }
 

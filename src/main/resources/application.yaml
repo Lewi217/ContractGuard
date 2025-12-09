@@ -8,8 +8,8 @@ spring:
   # Database Configuration
   datasource:
     url: jdbc:postgresql://localhost:5432/contractguard_db
-    username: ${db.username}
-    password: ${db.password}
+    username: lewis
+    password: gakpo901
     driver-class-name: org.postgresql.Driver
 
   # JPA/Hibernate Configuration
@@ -52,7 +52,7 @@ spring:
   # Security Configuration
   security:
     jwt:
-      secret: ${JWT_SECRET}
+      secret: ${JWT_SECRET:Cwl+mM9B02LYx+d3ywwvItWeSVc7/ZN32tAbk+3SO7DJ7kiJSBgZIGs8p9sIiVzlW6wiQVQP23uzoBqpi3uzAQ==}
       expiration: ${JWT_EXPIRATION:86400000}  # 24 hours in milliseconds
 
 # Server Configuration
@@ -89,3 +89,25 @@ logging:
     org.springframework.web: DEBUG
 
 ---
+# Production Profile
+spring:
+  config:
+    activate:
+      on-profile: prod
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/contractguard_db}
+    username: ${DB_USER:contractguard_user}
+    password: ${DB_PASSWORD:contractguard_pass}
+  jpa:
+    show-sql: false
+    hibernate:
+      ddl-auto: validate
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+
+logging:
+  level:
+    root: WARN
+    ContractGuard: INFO
