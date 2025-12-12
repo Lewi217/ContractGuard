@@ -4,6 +4,7 @@ import ContractGuard.ContractGuard.services.consumer.dto.CreateConsumerRequest;
 import ContractGuard.ContractGuard.services.consumer.dto.UpdateConsumerRequest;
 import ContractGuard.ContractGuard.services.consumer.dto.ConsumerResponse;
 import ContractGuard.ContractGuard.services.consumer.model.Consumer;
+import ContractGuard.ContractGuard.services.consumer.service.ConsumerService;
 import ContractGuard.ContractGuard.services.contract.model.Organization;
 import ContractGuard.ContractGuard.shared.exception.ResourceNotFoundException;
 import ContractGuard.ContractGuard.services.consumer.repository.ConsumerRepository;
@@ -23,14 +24,12 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @Slf4j
 @Transactional
-public class ConsumerServiceImpl {
+public class ConsumerServiceImpl implements ConsumerService {
 
     private final ConsumerRepository consumerRepository;
     private final OrganizationRepository organizationRepository;
 
-    /**
-     * Register a new consumer
-     */
+    @Override
     @CacheEvict(value = "consumers", allEntries = true)
     public ConsumerResponse registerConsumer(CreateConsumerRequest request) {
         log.info("Registering consumer: {} for organization: {}", request.getName(), request.getOrganizationId());
@@ -54,9 +53,8 @@ public class ConsumerServiceImpl {
         return mapToResponse(savedConsumer);
     }
 
-    /**
-     * Get consumer by ID
-     */
+
+    @Override
     @Cacheable(value = "consumers", key = "#consumerId")
     public ConsumerResponse getConsumer(UUID consumerId) {
         log.info("Fetching consumer: {}", consumerId);
@@ -65,9 +63,7 @@ public class ConsumerServiceImpl {
         return mapToResponse(consumer);
     }
 
-    /**
-     * Get consumers for organization
-     */
+    @Override
     @Transactional(readOnly = true)
     public List<ConsumerResponse> getConsumersByOrganization(UUID organizationId) {
         log.info("Fetching consumers for organization: {}", organizationId);
@@ -77,9 +73,8 @@ public class ConsumerServiceImpl {
             .collect(Collectors.toList());
     }
 
-    /**
-     * Get active consumers for organization
-     */
+
+    @Override
     @Transactional(readOnly = true)
     public List<ConsumerResponse> getActiveConsumers(UUID organizationId) {
         log.info("Fetching active consumers for organization: {}", organizationId);
@@ -89,9 +84,7 @@ public class ConsumerServiceImpl {
             .collect(Collectors.toList());
     }
 
-    /**
-     * Search consumers by name
-     */
+    @Override
     @Transactional(readOnly = true)
     public List<ConsumerResponse> searchConsumersByName(UUID organizationId, String searchTerm) {
         log.info("Searching consumers with name: {}", searchTerm);
@@ -101,9 +94,8 @@ public class ConsumerServiceImpl {
             .collect(Collectors.toList());
     }
 
-    /**
-     * Get consumer by API key
-     */
+
+    @Override
     @Transactional(readOnly = true)
     public Consumer getConsumerByApiKey(String apiKey) {
         log.info("Fetching consumer by API key");
@@ -111,9 +103,8 @@ public class ConsumerServiceImpl {
             .orElseThrow(() -> new ResourceNotFoundException("Consumer not found"));
     }
 
-    /**
-     * Update consumer
-     */
+
+    @Override
     @CacheEvict(value = "consumers", key = "#consumerId")
     public ConsumerResponse updateConsumer(UUID consumerId, UpdateConsumerRequest request) {
         log.info("Updating consumer: {}", consumerId);
@@ -143,9 +134,8 @@ public class ConsumerServiceImpl {
         return mapToResponse(updatedConsumer);
     }
 
-    /**
-     * Deactivate consumer
-     */
+
+    @Override
     @CacheEvict(value = "consumers", key = "#consumerId")
     public ConsumerResponse deactivateConsumer(UUID consumerId) {
         log.info("Deactivating consumer: {}", consumerId);
@@ -160,9 +150,7 @@ public class ConsumerServiceImpl {
         return mapToResponse(updatedConsumer);
     }
 
-    /**
-     * Delete consumer
-     */
+
     @CacheEvict(value = "consumers", allEntries = true)
     public void deleteConsumer(UUID consumerId) {
         log.info("Deleting consumer: {}", consumerId);
@@ -175,9 +163,7 @@ public class ConsumerServiceImpl {
         log.info("Consumer deleted successfully: {}", consumerId);
     }
 
-    /**
-     * Map Consumer entity to ConsumerResponse DTO
-     */
+
     private ConsumerResponse mapToResponse(Consumer consumer) {
         return ConsumerResponse.builder()
             .id(consumer.getId())
