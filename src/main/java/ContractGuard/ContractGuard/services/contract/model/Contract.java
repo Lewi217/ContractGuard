@@ -44,7 +44,7 @@ public class Contract {
 
     @Column(nullable = false, length = 50)
     @Builder.Default
-    private String status = "DRAFT"; // DRAFT, ACTIVE, DEPRECATED, RETIRED
+    private String status = "DRAFT";
 
     @Column(nullable = false, length = 255)
     private String basePath;

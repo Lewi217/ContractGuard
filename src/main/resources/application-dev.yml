@@ -2,17 +2,13 @@ spring:
   application:
     name: ContractGuard
 
-  profiles:
-    active: ${SPRING_PROFILES_ACTIVE:dev}
 
-  config:
-    import:
-      - "classpath:key.properties"
   datasource:
     url: jdbc:postgresql://localhost:5432/contractguard_db
     username: ${db.username}
     password: ${db.password}
     driver-class-name: org.postgresql.Driver
+
 
   jpa:
     hibernate:
@@ -25,7 +21,7 @@ spring:
           batch_size: 20
         order_inserts: true
         order_updates: true
-    show-sql: false
+    show-sql: true
     open-in-view: false
 
 
@@ -50,11 +46,11 @@ spring:
   jackson:
     default-property-inclusion: non_null
 
-
   security:
     jwt:
       secret: ${secret.key}
       expiration: 86400000
+
 
 server:
   port: 8080
@@ -65,8 +61,10 @@ logging:
   level:
     root: INFO
     ContractGuard: DEBUG
-    org.springframework.web: INFO
+    org.springframework.web: DEBUG
+    org.springframework.security: DEBUG
     org.hibernate.SQL: DEBUG
     org.hibernate.type.descriptor.sql.BasicBinder: TRACE
-
+  pattern:
+    console: "%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
 
