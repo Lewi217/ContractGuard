@@ -25,8 +25,8 @@ public class CreateContractRequest {
     @NotBlank(message = "Base path is required")
     private String basePath;
 
-    @NotNull(message = "OpenAPI spec is required")
-    private JsonNode openapiSpec;
+    @NotBlank(message = "OpenAPI URL is required")
+    private String openapiUrl;
 
     private String description;
     private String[] tags;

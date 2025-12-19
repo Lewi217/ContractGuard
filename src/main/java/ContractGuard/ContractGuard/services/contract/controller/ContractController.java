@@ -48,8 +48,8 @@ public class ContractController {
     @GetMapping
     @Operation(summary = "Get paginated contracts for organization")
     public ResponseEntity<Page<ContractResponse>> getContractsPaginated(
-        @RequestParam UUID organizationId,
-        Pageable pageable) {
+            @RequestParam UUID organizationId,
+            Pageable pageable) {
         Page<ContractResponse> response = contractService.getContractsByOrganizationPaginated(organizationId, pageable);
         return ResponseEntity.ok(response);
     }
@@ -57,8 +57,8 @@ public class ContractController {
     @GetMapping("/status/{status}")
     @Operation(summary = "Get contracts by status")
     public ResponseEntity<List<ContractResponse>> getContractsByStatus(
-        @RequestParam UUID organizationId,
-        @PathVariable String status) {
+            @RequestParam UUID organizationId,
+            @PathVariable String status) {
         List<ContractResponse> response = contractService.getContractsByStatus(organizationId, status);
         return ResponseEntity.ok(response);
     }
@@ -66,8 +66,8 @@ public class ContractController {
     @GetMapping("/search")
     @Operation(summary = "Search contracts by name")
     public ResponseEntity<List<ContractResponse>> searchContracts(
-        @RequestParam UUID organizationId,
-        @RequestParam String searchTerm) {
+            @RequestParam UUID organizationId,
+            @RequestParam String searchTerm) {
         List<ContractResponse> response = contractService.searchContractsByName(organizationId, searchTerm);
         return ResponseEntity.ok(response);
     }
@@ -75,8 +75,8 @@ public class ContractController {
     @PutMapping("/{contractId}")
     @Operation(summary = "Update an existing contract")
     public ResponseEntity<ContractResponse> updateContract(
-        @PathVariable UUID contractId,
-        @Valid @RequestBody CreateContractRequest request) {
+            @PathVariable UUID contractId,
+            @Valid @RequestBody CreateContractRequest request) {
         ContractResponse response = contractService.updateContract(contractId, request);
         return ResponseEntity.ok(response);
     }
@@ -109,4 +109,3 @@ public class ContractController {
         return ResponseEntity.ok(response);
     }
 }
-
