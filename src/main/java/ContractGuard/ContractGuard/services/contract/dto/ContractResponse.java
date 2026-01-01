@@ -25,4 +25,3 @@ public class ContractResponse {
     private LocalDateTime deprecatedAt;
     private LocalDateTime retiredAt;
 }
-
