@@ -1,18 +1,22 @@
 spring:
   application:
     name: ContractGuard
-
+  config:
+    import:
+      - "classpath:key.properties"
 
   datasource:
-    url: jdbc:postgresql://localhost:5432/contractguard_db
-    username: ${db.username}
-    password: ${db.password}
+    url: ${DATABASE_URL}
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
-
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 5
 
   jpa:
     hibernate:
-      ddl-auto: validate
+      ddl-auto: update
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
@@ -24,36 +28,35 @@ spring:
     show-sql: true
     open-in-view: false
 
-
   flyway:
     enabled: true
     baseline-on-migrate: true
     locations: classpath:db/migration
 
-
   data:
     redis:
-      host: localhost
-      port: 6379
-      timeout: 2000
+      host: ${REDIS_HOST}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD}
+      ssl:
+        enabled: ${REDIS_SSL:false}
+      timeout: 2000ms
       jedis:
         pool:
           max-active: 8
           max-idle: 8
-          min-idle: 0
-
+          min-idle: 4
 
   jackson:
     default-property-inclusion: non_null
 
   security:
     jwt:
-      secret: ${secret.key}
-      expiration: 86400000
-
+      secret: ${SECRET_KEY}
+      expiration: ${JWT_EXPIRATION:86400000}
 
 server:
-  port: 8080
+  port: ${SERVER_PORT:8080}
   servlet:
     context-path: /
 
@@ -68,3 +71,18 @@ logging:
   pattern:
     console: "%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true
+  health:
+    livenessState:
+      enabled: true
+    readinessState:
+      enabled: true
