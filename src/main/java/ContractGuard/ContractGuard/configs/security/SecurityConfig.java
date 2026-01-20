@@ -1,6 +1,5 @@
 package ContractGuard.ContractGuard.configs.security;
 
-import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -14,11 +13,15 @@ import org.springframework.web.cors.CorsConfigurationSource;
 
 @Configuration
 @EnableWebSecurity
-@RequiredArgsConstructor
 public class SecurityConfig {
 
     private final JwtProvider jwtProvider;
     private final CorsConfigurationSource corsConfigurationSource;
+
+    public SecurityConfig(JwtProvider jwtProvider, CorsConfigurationSource corsConfigurationSource) {
+        this.jwtProvider = jwtProvider;
+        this.corsConfigurationSource = corsConfigurationSource;
+    }
 
     @Bean
     public PasswordEncoder passwordEncoder() {
