@@ -1,13 +1,18 @@
 package ContractGuard.ContractGuard.services.changeDetection.service.impl;
 
-import ContractGuard.ContractGuard.services.changeDetection.dto.BreakingChangeResponse;
-import ContractGuard.ContractGuard.services.changeDetection.dto.ChangeDetectionReport;
-import ContractGuard.ContractGuard.services.changeDetection.dto.DetectChangesRequest;
-import ContractGuard.ContractGuard.services.changeDetection.service.ChangeDetectionService;
+import ContractGuard.ContractGuard.services.changeDetection.dto.*;
+import ContractGuard.ContractGuard.services.changeDetection.model.BreakingChangeDetailed;
+import ContractGuard.ContractGuard.services.changeDetection.model.ChangeDetail;
+import ContractGuard.ContractGuard.services.changeDetection.model.ImpactAnalysis;
+import ContractGuard.ContractGuard.services.changeDetection.repository.BreakingChangeDetailedRepository;
+import ContractGuard.ContractGuard.services.changeDetection.repository.ChangeDetailRepository;
+import ContractGuard.ContractGuard.services.changeDetection.repository.ImpactAnalysisRepository;
+import ContractGuard.ContractGuard.services.changeDetection.service.*;
 import ContractGuard.ContractGuard.services.contract.model.BreakingChange;
 import ContractGuard.ContractGuard.services.contract.model.Contract;
 import ContractGuard.ContractGuard.services.contract.repository.BreakingChangeRepository;
 import ContractGuard.ContractGuard.services.contract.repository.ContractRepository;
+import ContractGuard.ContractGuard.services.consumer.repository.ConsumerRepository;
 import ContractGuard.ContractGuard.shared.exception.ResourceNotFoundException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -27,7 +32,14 @@ import java.util.stream.Collectors;
 public class ChangeDetectionServiceImpl implements ChangeDetectionService {
 
     private final BreakingChangeRepository breakingChangeRepository;
+    private final BreakingChangeDetailedRepository breakingChangeDetailedRepository;
+    private final ChangeDetailRepository changeDetailRepository;
+    private final ImpactAnalysisRepository impactAnalysisRepository;
     private final ContractRepository contractRepository;
+    private final ConsumerRepository consumerRepository;
+    private final OpenApiDiffEngine openApiDiffEngine;
+    private final ImpactAnalyzer impactAnalyzer;
+    private final MigrationGuideGenerator migrationGuideGenerator;
 
     @Override
     public ChangeDetectionReport detectChanges(DetectChangesRequest request) {
@@ -513,6 +525,181 @@ public class ChangeDetectionServiceImpl implements ChangeDetectionService {
                 .migrationGuide(change.getMigrationGuide())
                 .detectedAt(change.getDetectedAt())
                 .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public BreakingChangeDetailedResponse getBreakingChangeDetails(UUID breakingChangeId) {
+        log.info("Fetching detailed information for breaking change: {}", breakingChangeId);
+        BreakingChangeDetailed change = breakingChangeDetailedRepository.findById(breakingChangeId)
+            .orElseThrow(() -> new ResourceNotFoundException("Breaking change not found"));
+
+        return mapToDetailedResponse(change);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<BreakingChangeDetailedResponse> getDetailedChangesBetweenVersions(UUID contractId, String oldVersion, String newVersion) {
+        log.info("Fetching detailed changes between versions {} and {} for contract {}", oldVersion, newVersion, contractId);
+        return breakingChangeDetailedRepository.findChangesBetweenVersions(contractId, oldVersion, newVersion)
+            .stream()
+            .map(this::mapToDetailedResponse)
+            .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ImpactAnalysisReportResponse analyzeImpactForChanges(UUID contractId, String oldVersion, String newVersion) {
+        log.info("Analyzing impact for contract {} between versions {} and {}", contractId, oldVersion, newVersion);
+
+        Contract contract = contractRepository.findById(contractId)
+            .orElseThrow(() -> new ResourceNotFoundException("Contract not found"));
+
+        List<BreakingChangeDetailed> changes = breakingChangeDetailedRepository
+            .findChangesBetweenVersions(contractId, oldVersion, newVersion);
+
+        List<ImpactAnalysis> impactAnalyses = impactAnalysisRepository.findByContractId(contractId);
+
+        long criticalCount = impactAnalyses.stream()
+            .filter(ia -> "CRITICAL".equals(ia.getImpactLevel()))
+            .count();
+        long highCount = impactAnalyses.stream()
+            .filter(ia -> "HIGH".equals(ia.getImpactLevel()))
+            .count();
+        long mediumCount = impactAnalyses.stream()
+            .filter(ia -> "MEDIUM".equals(ia.getImpactLevel()))
+            .count();
+        long lowCount = impactAnalyses.stream()
+            .filter(ia -> "LOW".equals(ia.getImpactLevel()))
+            .count();
+
+        int totalEffort = impactAnalyses.stream()
+            .mapToInt(ia -> ia.getEstimatedMigrationEffort() != null ? ia.getEstimatedMigrationEffort() : 0)
+            .sum();
+
+        String deploymentApproach = impactAnalyzer.recommendDeploymentApproach(impactAnalyses);
+
+        List<ImpactAnalysisResponse> responses = impactAnalyses.stream()
+            .map(this::mapImpactAnalysisToResponse)
+            .collect(Collectors.toList());
+
+        return ImpactAnalysisReportResponse.builder()
+            .contractId(contractId)
+            .contractName(contract.getName())
+            .oldVersion(oldVersion)
+            .newVersion(newVersion)
+            .totalImpactedConsumers(impactAnalyses.size())
+            .criticalImpactCount((int) criticalCount)
+            .highImpactCount((int) highCount)
+            .mediumImpactCount((int) mediumCount)
+            .lowImpactCount((int) lowCount)
+            .estimatedTotalMigrationEffort(totalEffort)
+            .impactAnalyses(responses)
+            .recommendedDeploymentApproach(deploymentApproach)
+            .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ImpactAnalysisResponse> getImpactAnalysis(UUID contractId) {
+        log.info("Fetching impact analysis for contract: {}", contractId);
+        return impactAnalysisRepository.findByContractId(contractId)
+            .stream()
+            .map(this::mapImpactAnalysisToResponse)
+            .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ImpactAnalysisResponse> getImpactAnalysisByConsumer(UUID consumerId) {
+        log.info("Fetching impact analysis for consumer: {}", consumerId);
+        return impactAnalysisRepository.findConsumerImpactHistory(consumerId)
+            .stream()
+            .map(this::mapImpactAnalysisToResponse)
+            .collect(Collectors.toList());
+    }
+
+    @Override
+    public ImpactAnalysisResponse updateImpactAnalysisStatus(UUID impactAnalysisId, String status) {
+        log.info("Updating impact analysis {} status to: {}", impactAnalysisId, status);
+        ImpactAnalysis analysis = impactAnalysisRepository.findById(impactAnalysisId)
+            .orElseThrow(() -> new ResourceNotFoundException("Impact analysis not found"));
+
+        analysis.setStatus(status);
+        ImpactAnalysis updated = impactAnalysisRepository.save(analysis);
+
+        return mapImpactAnalysisToResponse(updated);
+    }
+
+    @Override
+    public void generateAndSaveMigrationGuides(UUID contractId) {
+        log.info("Generating migration guides for contract: {}", contractId);
+        List<BreakingChangeDetailed> changes = breakingChangeDetailedRepository.findByContractId(contractId);
+
+        for (BreakingChangeDetailed change : changes) {
+            String migrationGuide = migrationGuideGenerator.generateMigrationGuide(change);
+            String codeExample = migrationGuideGenerator.generateCodeExample(change);
+
+            change.setMigrationGuide(migrationGuide);
+            change.setCodeExample(codeExample);
+            breakingChangeDetailedRepository.save(change);
+        }
+
+        log.info("Generated migration guides for {} changes", changes.size());
+    }
+
+    private BreakingChangeDetailedResponse mapToDetailedResponse(BreakingChangeDetailed change) {
+        List<ChangeDetailResponse> changeDetails = change.getChangeDetails() != null ?
+            change.getChangeDetails().stream()
+                .map(cd -> ChangeDetailResponse.builder()
+                    .id(cd.getId())
+                    .breakingChangeId(change.getId())
+                    .fieldName(cd.getFieldName())
+                    .oldValue(cd.getOldValue())
+                    .newValue(cd.getNewValue())
+                    .changeType(cd.getChangeType())
+                    .severity(cd.getSeverity())
+                    .createdAt(cd.getCreatedAt())
+                    .build())
+                .collect(Collectors.toList())
+            : new ArrayList<>();
+
+        return BreakingChangeDetailedResponse.builder()
+            .id(change.getId())
+            .contractId(change.getContract().getId())
+            .oldVersion(change.getOldVersion())
+            .newVersion(change.getNewVersion())
+            .changeType(change.getChangeType())
+            .severity(change.getSeverity())
+            .description(change.getDescription())
+            .affectedEndpoint(change.getAffectedEndpoint())
+            .affectedField(change.getAffectedField())
+            .migrationGuide(change.getMigrationGuide())
+            .codeExample(change.getCodeExample())
+            .impactLevel(change.getImpactLevel())
+            .deprecationPath(change.getDeprecationPath())
+            .changeDetails(changeDetails)
+            .detectedAt(change.getDetectedAt())
+            .build();
+    }
+
+    private ImpactAnalysisResponse mapImpactAnalysisToResponse(ImpactAnalysis analysis) {
+        String consumerName = analysis.getConsumer() != null ? analysis.getConsumer().getName() : "Unknown";
+
+        return ImpactAnalysisResponse.builder()
+            .id(analysis.getId())
+            .contractId(analysis.getContract().getId())
+            .breakingChangeId(analysis.getBreakingChange().getId())
+            .consumerId(analysis.getConsumer().getId())
+            .consumerName(consumerName)
+            .impactScore(analysis.getImpactScore())
+            .impactLevel(analysis.getImpactLevel())
+            .status(analysis.getStatus())
+            .affectedEndpoints(analysis.getAffectedEndpoints())
+            .estimatedMigrationEffort(analysis.getEstimatedMigrationEffort())
+            .createdAt(analysis.getCreatedAt())
+            .updatedAt(analysis.getUpdatedAt())
+            .build();
     }
 }
 

@@ -7,6 +7,7 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
 @Entity
@@ -46,11 +47,14 @@ public class Consumer {
 
     @Column(nullable = false, length = 50)
     @Builder.Default
-    private String consumerType = "SERVICE"; // SERVICE, WEB_APP, MOBILE_APP, THIRD_PARTY
+    private String consumerType = "SERVICE";
 
     @Column(nullable = false)
     @Builder.Default
     private Boolean isActive = true;
+
+    @OneToMany(mappedBy = "consumer", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private List<ConsumerRegistration> contractVersions;
 
     @CreationTimestamp
     @Column(nullable = false, updatable = false)
