@@ -32,10 +32,5 @@ public interface ChangeDetectionService {
     ImpactAnalysisResponse updateImpactAnalysisStatus(UUID impactAnalysisId, String status);
 
     void generateAndSaveMigrationGuides(UUID contractId);
-
-
-    List<BreakingChangeResponse> getBreakingChangesByVersion(UUID contractId, String version);
-
-    void deleteBreakingChanges(UUID contractId);
 }
 
