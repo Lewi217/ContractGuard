@@ -19,14 +19,41 @@ jobs:
     name: Run Tests
     runs-on: ubuntu-latest
 
+    # ✅ ADD THIS: PostgreSQL service container
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: testdb
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      # ✅ ADD THIS: Redis service container
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up JDK 17
+      - name: Set up JDK 21  # ✅ Changed from 17 to 21 to match your Dockerfile
         uses: actions/setup-java@v4
         with:
-          java-version: '17'
+          java-version: '21'
           distribution: 'temurin'
           cache: maven
 
@@ -40,8 +67,9 @@ jobs:
           REDIS_PORT: 6379
           REDIS_PASSWORD: ""
           REDIS_SSL: false
-          SECRET_KEY: test-secret-key-for-ci-only
+          SECRET_KEY: test-secret-key-for-ci-only-must-be-at-least-256-bits-long-for-HS256
           JWT_EXPIRATION: 86400000
+          SPRING_PROFILES_ACTIVE: dev
 
   # Job 2: Build and Push Docker Image (only on master push)
   build:
@@ -139,11 +167,11 @@ jobs:
             
             # Wait for application to be ready
             echo "Waiting for application to start..."
-            sleep 20
+            sleep 30
             
             # Health check
             echo "Running health check..."
-            max_attempts=10
+            max_attempts=15
             attempt=1
             
             while [ $attempt -le $max_attempts ]; do
@@ -153,13 +181,14 @@ jobs:
               else
                 echo "⏳ Attempt $attempt/$max_attempts failed, retrying..."
                 attempt=$((attempt + 1))
-                sleep 5
+                sleep 10
               fi
             done
             
             if [ $attempt -gt $max_attempts ]; then
               echo "❌ Health check failed after $max_attempts attempts"
-              docker compose -f docker-compose.prod.yml logs --tail=50
+              echo "=== Container Logs ==="
+              docker compose -f docker-compose.prod.yml logs --tail=100
               exit 1
             fi
             
