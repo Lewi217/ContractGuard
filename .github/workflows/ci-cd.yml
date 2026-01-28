@@ -14,12 +14,10 @@ env:
   IMAGE_NAME: lewi217/contractguard
 
 jobs:
-  # Job 1: Test (runs on both PRs and pushes)
   test:
     name: Run Tests
     runs-on: ubuntu-latest
 
-    # ✅ ADD THIS: PostgreSQL service container
     services:
       postgres:
         image: postgres:15
@@ -35,7 +33,6 @@ jobs:
         ports:
           - 5432:5432
 
-      # ✅ ADD THIS: Redis service container
       redis:
         image: redis:7-alpine
         options: >-
@@ -50,7 +47,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up JDK 21  # ✅ Changed from 17 to 21 to match your Dockerfile
+      - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
           java-version: '21'
@@ -71,7 +68,6 @@ jobs:
           JWT_EXPIRATION: 86400000
           SPRING_PROFILES_ACTIVE: dev
 
-  # Job 2: Build and Push Docker Image (only on master push)
   build:
     name: Build Docker Image
     runs-on: ubuntu-latest
@@ -117,7 +113,6 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  # Job 3: Deploy to Azure VM (only on master push)
   deploy:
     name: Deploy to Azure VM
     runs-on: ubuntu-latest
@@ -140,36 +135,28 @@ jobs:
             
             echo "=== Starting Deployment ==="
             
-            # Navigate to application directory
             cd /opt/contractguard || exit 1
             
-            # Pull latest code from master
             echo "Pulling latest code from master..."
             git fetch origin
             git checkout master
             git pull origin master
             
-            # Login to GitHub Container Registry
             echo "Logging in to GitHub Container Registry..."
             echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
             
-            # Pull latest image
             echo "Pulling latest Docker image..."
             docker compose -f docker-compose.prod.yml pull
             
-            # Stop old containers
             echo "Stopping old containers..."
             docker compose -f docker-compose.prod.yml down
             
-            # Start new containers
             echo "Starting new containers..."
             docker compose -f docker-compose.prod.yml up -d
             
-            # Wait for application to be ready
             echo "Waiting for application to start..."
             sleep 30
             
-            # Health check
             echo "Running health check..."
             max_attempts=15
             attempt=1
@@ -192,13 +179,11 @@ jobs:
               exit 1
             fi
             
-            # Clean up old images
             echo "Cleaning up old Docker images..."
             docker image prune -af --filter "until=24h"
             
             echo "=== Deployment Complete ==="
             
-            # Show running containers
             docker ps
 
       - name: Send deployment notification
