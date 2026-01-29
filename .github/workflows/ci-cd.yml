@@ -13,6 +13,7 @@ env:
   REGISTRY: ghcr.io
   IMAGE_NAME: lewi217/contractguard
 
+
 jobs:
   test:
     name: Run Tests
